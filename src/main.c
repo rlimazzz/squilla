@@ -52,6 +52,10 @@ int main(int argc, char* argv[]) {
         printf("Value count doesn't match the number of columns in '%s'.\n",
                statement.filename);
         break;
+      case EXECUTE_UNKNOWN_COLUMN:
+        printf("Unknown column referenced in WHERE/ORDER BY on '%s'.\n",
+               statement.filename);
+        break;
     }
   }
 

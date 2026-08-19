@@ -2,9 +2,24 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "util.h"
+
+typedef struct {
+  char fields[CSV_MAX_COLUMNS][CSV_MAX_VALUE_LEN];
+  int count;
+} CsvRow;
+
+static int find_column(const CsvHeader* header, const char* name) {
+  for (int i = 0; i < header->count; i++) {
+    if (strcmp(header->names[i], name) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
 
 int csv_split_fields(const char* line, char delimiter,
                       char fields[][CSV_MAX_VALUE_LEN]) {
@@ -141,15 +156,82 @@ static void print_display_field(const char* value) {
   fputc('"', stdout);
 }
 
-CsvResult csv_print_rows(const char* filename) {
+static void print_row(char fields[][CSV_MAX_VALUE_LEN], int count) {
+  printf("(");
+  for (int i = 0; i < count; i++) {
+    print_display_field(fields[i]);
+    printf("%s", (i == count - 1) ? "" : ", ");
+  }
+  printf(")\n");
+}
+
+// Parses `s` as a double, requiring the whole (trimmed) string to be
+// consumed so values like "12abc" are treated as text, not numbers.
+static bool parse_double(const char* s, double* out) {
+  char* end;
+  *out = strtod(s, &end);
+  if (end == s) {
+    return false;
+  }
+  while (*end == ' ') {
+    end++;
+  }
+  return *end == '\0';
+}
+
+// Sort context for compare_rows(): qsort's comparator takes no extra
+// argument, so the column to sort by is stashed here right before sorting.
+static int g_order_by_index;
+static bool g_order_by_descending;
+
+static int compare_rows(const void* a, const void* b) {
+  const char* value_a = ((const CsvRow*)a)->fields[g_order_by_index];
+  const char* value_b = ((const CsvRow*)b)->fields[g_order_by_index];
+
+  double num_a, num_b;
+  int cmp;
+  if (parse_double(value_a, &num_a) && parse_double(value_b, &num_b)) {
+    cmp = (num_a > num_b) - (num_a < num_b);
+  } else {
+    cmp = strcmp(value_a, value_b);
+  }
+
+  return g_order_by_descending ? -cmp : cmp;
+}
+
+CsvResult csv_print_rows(const char* filename, const CsvQuery* query) {
   FILE* file = fopen(filename, "r");
   if (file == NULL) {
     return CSV_FILE_NOT_FOUND;
   }
 
   char line[CSV_MAX_LINE_LEN];
-  char fields[CSV_MAX_COLUMNS][CSV_MAX_VALUE_LEN];
-  int printed_any = 0;
+  if (fgets(line, sizeof(line), file) == NULL) {
+    fclose(file);
+    return CSV_EMPTY_FILE;
+  }
+  str_trim(line);
+
+  CsvHeader header;
+  header.count = csv_split_fields(line, CSV_DELIMITER, header.names);
+
+  int where_index = -1;
+  if (query->has_where &&
+      (where_index = find_column(&header, query->where_column)) < 0) {
+    fclose(file);
+    return CSV_UNKNOWN_COLUMN;
+  }
+
+  int order_by_index = -1;
+  if (query->has_order_by &&
+      (order_by_index = find_column(&header, query->order_by_column)) < 0) {
+    fclose(file);
+    return CSV_UNKNOWN_COLUMN;
+  }
+
+  CsvRow* rows = NULL;
+  int row_count = 0;
+  int capacity = 0;
 
   while (fgets(line, sizeof(line), file) != NULL) {
     str_trim(line);
@@ -157,21 +239,33 @@ CsvResult csv_print_rows(const char* filename) {
       continue;
     }
 
-    int field_count = csv_split_fields(line, CSV_DELIMITER, fields);
-    printed_any = 1;
+    CsvRow row;
+    row.count = csv_split_fields(line, CSV_DELIMITER, row.fields);
 
-    printf("(");
-    for (int i = 0; i < field_count; i++) {
-      print_display_field(fields[i]);
-      printf("%s", (i == field_count - 1) ? "" : ", ");
+    if (query->has_where &&
+        strcmp(row.fields[where_index], query->where_value) != 0) {
+      continue;
     }
-    printf(")\n");
+
+    if (row_count == capacity) {
+      capacity = (capacity == 0) ? 16 : capacity * 2;
+      rows = realloc(rows, capacity * sizeof(CsvRow));
+    }
+    rows[row_count++] = row;
   }
   fclose(file);
 
-  if (!printed_any) {
-    return CSV_EMPTY_FILE;
+  if (query->has_order_by) {
+    g_order_by_index = order_by_index;
+    g_order_by_descending = query->order_by_descending;
+    qsort(rows, row_count, sizeof(CsvRow), compare_rows);
   }
 
-  return CSV_OK;
+  print_row(header.names, header.count);
+  for (int i = 0; i < row_count; i++) {
+    print_row(rows[i].fields, rows[i].count);
+  }
+  free(rows);
+
+  return (row_count == 0) ? CSV_EMPTY_FILE : CSV_OK;
 }

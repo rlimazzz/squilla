@@ -18,16 +18,19 @@ typedef enum {
   EXECUTE_SUCCESS,
   EXECUTE_FILE_NOT_FOUND,
   EXECUTE_EMPTY_FILE,
-  EXECUTE_COLUMN_COUNT_MISMATCH
+  EXECUTE_COLUMN_COUNT_MISMATCH,
+  EXECUTE_UNKNOWN_COLUMN
 } ExecuteResult;
 
 // The "compiled" form of an input line: which CSV file it targets and, for
-// an INSERT, the values to append to it.
+// an INSERT, the values to append to it, or for a SELECT, its WHERE/ORDER BY
+// clauses.
 typedef struct {
   StatementType type;
   char filename[STATEMENT_MAX_FILENAME_LEN];
   char values[CSV_MAX_COLUMNS][CSV_MAX_VALUE_LEN];
   int value_count;
+  CsvQuery query;
 } Statement;
 
 // Front-end: tokenizes/parses a line of input into a Statement.
