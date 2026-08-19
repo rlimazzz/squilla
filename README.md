@@ -1,3 +1,3 @@
 ### Squilla
 
-A simple open-source database made from scratch, following (https://cstack.github.io/db_tutorial/).
+A simple open-source database and csv editor using SQL queries made from scratch.
