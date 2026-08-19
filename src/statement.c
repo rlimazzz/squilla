@@ -47,11 +47,13 @@ static PrepareResult prepare_select(InputBuffer* input_buffer,
 
 PrepareResult prepare_statement(InputBuffer* input_buffer,
                                  Statement* statement) {
-  if (strncmp(input_buffer->buffer, "insert", 6) == 0) {
+  if ((strncmp(input_buffer->buffer, "insert", 6) == 0) ||
+      (strncmp(input_buffer->buffer, "INSERT", 6) == 0)) {
     return prepare_insert(input_buffer, statement);
   }
 
-  if (strncmp(input_buffer->buffer, "select", 6) == 0) {
+  if ((strncmp(input_buffer->buffer, "select", 6) == 0) ||
+      (strncmp(input_buffer->buffer, "SELECT", 6) == 0)) {
     return prepare_select(input_buffer, statement);
   }
 
