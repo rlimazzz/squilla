@@ -43,18 +43,36 @@ int main(int argc, char* argv[]) {
         printf("Executed.\n");
         break;
       case EXECUTE_FILE_NOT_FOUND:
-        printf("File '%s' not found.\n", statement.filename);
+        printf("Table '%s' not found.\n",
+               table_display_name(statement.filename));
         break;
       case EXECUTE_EMPTY_FILE:
-        printf("File '%s' has no rows.\n", statement.filename);
+        printf("Table '%s' has no rows.\n",
+               table_display_name(statement.filename));
         break;
       case EXECUTE_COLUMN_COUNT_MISMATCH:
-        printf("Value count doesn't match the number of columns in '%s'.\n",
-               statement.filename);
+        printf("Value count doesn't match the number of columns in table "
+               "'%s'.\n",
+               table_display_name(statement.filename));
         break;
       case EXECUTE_UNKNOWN_COLUMN:
-        printf("Unknown column referenced in WHERE/ORDER BY on '%s'.\n",
-               statement.filename);
+        printf("Unknown column referenced in WHERE/ORDER BY on table "
+               "'%s'.\n",
+               table_display_name(statement.filename));
+        break;
+      case EXECUTE_TABLE_ALREADY_EXISTS:
+        printf("Table '%s' already exists.\n",
+               table_display_name(statement.filename));
+        break;
+      case EXECUTE_VALUE_TOO_LONG:
+        printf("A value is too long for its column in table '%s'.\n",
+               table_display_name(statement.filename));
+        break;
+      case EXECUTE_IMPORT_SOURCE_NOT_FOUND:
+        printf("CSV file '%s' not found.\n", statement.import_source);
+        break;
+      case EXECUTE_IMPORT_SOURCE_EMPTY:
+        printf("CSV file '%s' has no header row.\n", statement.import_source);
         break;
     }
   }
